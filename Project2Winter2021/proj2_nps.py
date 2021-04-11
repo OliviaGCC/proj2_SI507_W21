@@ -6,6 +6,7 @@
 from bs4 import BeautifulSoup
 import requests
 import json
+import time
 import secrets # file that contains your API key
 from requests_oauthlib import OAuth1
 
@@ -14,7 +15,7 @@ CACHE_FILENAME = "/Users/designurlife/Documents/Winter2021/week8/project2/nps_ca
 
 CACHE_DICT = {}
 
-findapark_url = "https://www.nps.gov/findapark/index.htm"
+
 
 def open_cache():
     ''' Opens the cache file if it exists and loads the JSON into
@@ -56,6 +57,18 @@ def save_cache(cache_dict):
     fw.close() 
 
 
+def make_url_request_using_cache(url, cache_dict,params = None):
+    if url in cache_dict:
+        print("Using cache")
+        return cache_dict[url]
+    
+
+    else:
+        print("Fetching")
+        cache_dict[url]= requests.get(url, params = params).text
+        save_cache(cache_dict)
+        return cache_dict[url]
+
 
 class NationalSite:
     '''a national site
@@ -90,11 +103,11 @@ class NationalSite:
 #method info(),The format is <name> (<category>): <address> <zip> .
     def info(self):
         if self.category != None:
-            return self.name + " (" + self.category +") " + " : " + self.address + " " + self.zipcode
+            return self.name + " (" + self.category +")" + ": " + self.address + " " + self.zipcode
         else: 
-            return self.name  + " : " + self.address + " " + self.zipcode
+            return self.name  + ": " + self.address + " " + self.zipcode
 
-####~~~~ do i need to cache this one????
+
 def build_state_url_dict(): 
     ''' Make a dictionary that maps state name to state page url from "https://www.nps.gov"
 
@@ -113,38 +126,39 @@ def build_state_url_dict():
 
 
 
-    if findapark_url in CACHE_DICT.keys():
-        print("Using cache")
-        return CACHE_DICT[findapark_url]
+    # if findapark_url in CACHE_DICT.keys():
+    #     print("Using cache")
+    #     return state_url_dict
     
 
-    else:
-        print("Fetching")
+    # else:
+    #     print("Fetching")
+    #     time.sleep(1)
+
+
+    findapark_url = "https://www.nps.gov/findapark/index.htm"
+    html = make_url_request_using_cache(findapark_url, CACHE_DICT)
 
     
+        
 
-        #make the soup
-        html = requests.get("https://www.nps.gov/findapark/index.htm").text
-        #use BeautifulSoup and an html parser to read in the data
-        soup = BeautifulSoup(html, 'html.parser')
-        CACHE_DICT[findapark_url] = state_url_dict # save the findapark url as ane dist item in CACHE
-        #print(soup.prettify()) # sanity check. Similar to json.dumps(json_object, indent=2)
+    #use BeautifulSoup and an html parser to read in the data
+    soup = BeautifulSoup(html, 'html.parser')
 
-        search_div = soup.find(id="Map")
-        headers = search_div.find_all('area') # build a list by looking for 'area'
-        #print(headers)
+    #print(soup.prettify()) # sanity check. Similar to json.dumps(json_object, indent=2)
 
-        state_url_dict = {} # build an empty dict which will store state name and its state_url
-        for s in headers:
-            state_url_dict[s["alt"]]= "https://www.nps.gov" +s["href"]
-
-
-        ####~~~~ add the state url dict into cache????  
-        save_cache(CACHE_DICT)
-
+    search_div = soup.find(id="Map")
+    headers = search_div.find_all('area') # build a list by looking for 'area'
     
-        #return state_url_dict
-        return CACHE_DICT[findapark_url]
+
+
+    state_url_dict = {} # build an empty dict which will store state name and its state_url
+    for s in headers:
+        state_url_dict[s["alt"].lower()]= "https://www.nps.gov" +s["href"]
+
+    #CACHE_DICT[findapark_url] = state_url_dict # save the findapark url as ane dist item in CACHE
+
+    return state_url_dict
 
 
        
@@ -165,37 +179,49 @@ def get_site_instance(site_url):
 
     CACHE_DICT = open_cache()
 
-    if site_url in CACHE_DICT.keys():
-        print("Using cache")
-        return CACHE_DICT[site_url]
+    # if site_url in CACHE_DICT.keys():
+    #     print("Using cache")
+    #     return site_instance
 
 
-    else: 
-        print("Fetching")
-
-
-        #make the soup
-        html = requests.get(site_url).text
-        #use BeautifulSoup and an html parser to read in the data
-        soup = BeautifulSoup(html, 'html.parser')
-        CACHE_DICT[site_url]
-
-
-        nm = soup.find('a', class_ = "Hero-title").text
-        ct = soup.find('span', class_="Hero-designation").text
-        add = soup.find('span', itemprop="addressLocality").text
-        zp = soup.find('span', class_="postal-code").text
-        ph = soup.find('span',class_="tel").text
+    # else: 
+    #     print("Fetching")
+    #     time.sleep(1)
+    #     html = requests.get(site_url).text
+    #     CACHE_DICT[site_url] = html
+    #     save_cache(CACHE_DICT)
 
         
-        site_instance= NationalSite(nm,add,zp,ph,ct)
+
+    html = make_url_request_using_cache(site_url, CACHE_DICT)
         
-        #CACHE_DICT[site_url] = {"name": site_instance.name, "address": site_instance.address, "zipcode":site_instance.zipcode,"phone": site_instance.phone, "category": site_instance.category}
-        
-        
-        #save_cache(CACHE_DICT)####~~~~TypeError: Object of type NationalSite is not JSON serializable
-        #return CACHE_DICT[site_url]
-        return site_instance
+    #use BeautifulSoup and an html parser to read in the data
+    soup = BeautifulSoup(html, 'html.parser')
+
+
+
+
+    nm = soup.find('a', class_ = "Hero-title").text.strip()
+    ct = soup.find('span', class_="Hero-designation").text.strip()
+    try:
+        add = soup.find('span', itemprop="addressLocality").text.strip()+ ", " + soup.find('span', itemprop="addressRegion").text.strip()
+    except: 
+        add = ""
+    try:
+        zp = soup.find('span', class_="postal-code").text.strip()
+    except:
+        zp = ""
+    ph = soup.find('span',class_="tel").text.strip()
+
+    
+    site_instance= NationalSite(nm,add,zp,ph,ct)
+    
+    #CACHE_DICT[site_url] = {"name": site_instance.name, "address": site_instance.address, "zipcode":site_instance.zipcode,"phone": site_instance.phone, "category": site_instance.category}
+
+    
+    #save_cache(CACHE_DICT)####~~~~TypeError: Object of type NationalSite is not JSON serializable
+    #return CACHE_DICT[site_url]
+    return site_instance
 
 
 
@@ -218,45 +244,78 @@ def get_sites_for_state(state_url):
 
     CACHE_DICT = open_cache()
 
-    if state_url in CACHE_DICT.keys():
-        print("Using cache")
-        return CACHE_DICT[state_url]
+    # if state_url in CACHE_DICT.keys():
+    #     print("Using cache")
+    #     return nationalsiteList
 
     
-    else:
-        print("Fetching")
+    # else:
+    #     print("Fetching")
+    #     time.sleep(1)
 
-        #make the soup
-        html = requests.get(state_url).text
-        #use BeautifulSoup and an html parser to read in the data
-        soup = BeautifulSoup(html, 'html.parser')
-        CACHE_DICT[state_url] #cache beautigfulsoup
-        nationalsiteList = []
-
-        headers = soup.find_all('h3')
+    #     html = requests.get(state_url).text
+    #     CACHE_DICT[state_url] = html
+    #     save_cache(CACHE_DICT)
 
 
-        for i in headers: 
-            if i.find('a') is not None: 
-                short_site_url= i.find('a')['href']
-                site_URL = "https://www.nps.gov/" + short_site_url
-                nationalsiteList.append(get_site_instance(site_URL))
+    html = make_url_request_using_cache(state_url,CACHE_DICT)
 
-                
-        #CACHE_DICT[state_url] = nationalsiteList
-        #save_cache(CACHE_DICT) ####~~~~
-        #print(nationalsiteList)
-        
-        return nationalsiteList
-        #return CACHE_DICT[state_url]
+    #use BeautifulSoup and an html parser to read in the data
+    soup = BeautifulSoup(html, 'html.parser')
+    #CACHE_DICT[state_url] = soup #cache beautigfulsoup
+    #~~~~~~~~~~~~~~~~~~~~~~~~save_cache(CACHE_DICT) 
 
+    nationalsiteList = []
+
+    headers = soup.find_all('h3')
+
+
+    for i in headers: 
+        if i.find('a') is not None: 
+            short_site_url= i.find('a')['href']
+            site_URL = "https://www.nps.gov/" + short_site_url
+            nationalsiteList.append(get_site_instance(site_URL))
+
+            
+    #CACHE_DICT[state_url] = nationalsiteList
     
-    #print format: [number] <name> (<type>):<address> <zip code>
-    # for l in nationalsiteList: 
-    #     print(nationalsiteList.index(l)+1), " ",l)
+    #print(nationalsiteList)
+    
+    return nationalsiteList
+    #return CACHE_DICT[state_url]
 
 
 
+
+def construct_unique_key(baseurl, params):
+    ''' constructs a key that is guaranteed to uniquely and 
+    repeatably identify an API request by its baseurl and params
+
+    AUTOGRADER NOTES: To correctly test this using the autograder, use an underscore ("_") 
+    to join your baseurl with the params and all the key-value pairs from params
+    E.g., baseurl_key1_value1
+    
+    Parameters
+    ----------
+    baseurl: string
+        The URL for the API endpoint
+    params: dict
+        A dictionary of param:value pairs
+    
+    Returns
+    -------
+    string
+        the unique key as a string
+    '''
+    #TODO Implement function
+    
+    params_str = []
+    connector = '_'
+    for d in params.keys(): 
+        params_str.append(f"{d}_{params[d]}")
+    params_str.sort() # sort the params based on the key alphabet order, then in defination of params, do not need to put count in front of q
+    unique_key = baseurl+connector+connector.join(params_str) #join() concatenates strings
+    return unique_key
 
 def get_nearby_places(site_object):
     '''Obtain API data from MapQuest API.
@@ -271,53 +330,53 @@ def get_nearby_places(site_object):
     dict
         a converted API return from MapQuest API
     '''
-    
+    CACHE_DICT = open_cache()
+
+
     api_key = secrets.API_KEY
     #GluS6GW6C2ABVLJSnFXYv38tP23j9XuM
     
-
     base_url = "http://www.mapquestapi.com/search/v2/radius?radius=10&maxMatches=10&ambiguities=ignore&outFormat=json"
 
     #https://www.mapquestapi.com/search/v2/radius?radius=4&maxMatches=3&ambiguities=ignore&outFormat=json&key=GluS6GW6C2ABVLJSnFXYv38tP23j9XuM&origin=48310
 
+    params = {'key': api_key, 'origin': site_object.zipcode} #define params dict
 
-    params = {'key': api_key, 'origin': site_object.zipcode}
+    
 
+    # if site_object.zipcode in CACHE_DICT.keys(): 
+    #     print("Using cache")
+    #     return result_dict
 
-    if site_object.zipcode in CACHE_DICT.keys():
-        print("Using cache")
-        return CACHE_DICT[site_object.zipcode]
+    # else: 
+    #     print("Fetching")
 
-    else: 
-        print("Fetching")
+        # #unique_KEY = construct_unique_key(base_url, params)
+        # print(unique_KEY)
+    html = make_url_request_using_cache(base_url,CACHE_DICT, params = params)
 
+        # response = requests.get(base_url,params = params) #request json from url
+    results = json.loads(html)
 
-
-        response = requests.get(base_url,params = params)
-
-        results = response.json()
-
-        CACHE_DICT[site_object]
-
-
-        statuslist = results["searchResults"]
-
-        result_dict = {}
+    statuslist = results["searchResults"]
 
 
-        for z in statuslist:
-            if z["fields"]["address"] == "" or z["fields"]["group_sic_code"] =="":
-                key = z["name"] + " (no category)"
-                result_dict[key] = ": no address" + " " + z["fields"]["city"]
-            else:
-                key = z["name"] + " (" + z["fields"]["group_sic_code_name_ext"]+") "
-                result_dict[key] = z["fields"]["address"] + " " + z["fields"]["city"]
-        
-        #CACHE_DICT[site_object.zipcode] = result_dict
-        save_cache(CACHE_DICT)
+    result_dict = {} # define a new dict which will be the result of nearby place with key as the name + category
 
-        #return result_dict
-        return result_dict
+
+    for z in statuslist:
+        if z["fields"]["address"] == "" or z["fields"]["group_sic_code"] =="":
+            key = z["name"] + " (no category)"
+            result_dict[key] = ": no address" + " " + z["fields"]["city"]
+        else:
+            key = z["name"] + " (" + z["fields"]["group_sic_code_name_ext"]+") "
+            result_dict[key] = z["fields"]["address"] + " " + z["fields"]["city"]
+    
+    #CACHE_DICT[site_object.zipcode] = result_dict
+    #save_cache(CACHE_DICT)
+
+    #return result_dict
+    return result_dict
 
 
 
@@ -327,11 +386,10 @@ def get_nearby_places(site_object):
 
 
 if __name__ == "__main__":
-    
+    state_url_dict = build_state_url_dict()
     user_input = input ("Enter a state name(e.g. Mighian or michigan) or exit: ").lower()
 
-    CACHE_DICT = open_cache()
-    #state_url_dict = build_state_url_dict()
+    #CACHE_DICT = open_cache()
 
     while True: 
         if user_input == "exit" : 
@@ -340,7 +398,6 @@ if __name__ == "__main__":
 
 
         else:
-            state_url_dict = build_state_url_dict()
             for d in state_url_dict: 
                 if user_input == d.lower(): # convert the key to lower case and compare with inpu, look for the state name in the build_state_url_dict
                     state_url = state_url_dict[d]
@@ -358,7 +415,6 @@ if __name__ == "__main__":
 
                 NationalSite_dict ={}
                 for l in nationalsiteList: # as get_sites_for_state() function returns nationalsiteList(return: Class NationalSite instance)
-                    print(l)
                     NationalSite_dict[str(nationalsiteList.index(l)+1)] = l.info()
                 for s in NationalSite_dict: 
                     print("[",s,"]", NationalSite_dict[s])
