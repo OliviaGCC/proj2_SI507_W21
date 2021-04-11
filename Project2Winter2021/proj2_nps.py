@@ -1,6 +1,6 @@
 #################################
-##### Name:
-##### Uniqname:
+##### Name: Chenchen Gao
+##### Uniqname: gaochenc
 #################################
 
 from bs4 import BeautifulSoup
@@ -100,7 +100,7 @@ class NationalSite:
         if category != None: 
             self.category = category
 
-#method info(),The format is <name> (<category>): <address> <zip> .
+    #method info(),The format is <name> (<category>): <address> <zip> .
     def info(self):
         if self.category != None:
             return self.name + " (" + self.category +")" + ": " + self.address + " " + self.zipcode
@@ -125,17 +125,6 @@ def build_state_url_dict():
     CACHE_DICT = open_cache()
 
 
-
-    # if findapark_url in CACHE_DICT.keys():
-    #     print("Using cache")
-    #     return state_url_dict
-    
-
-    # else:
-    #     print("Fetching")
-    #     time.sleep(1)
-
-
     findapark_url = "https://www.nps.gov/findapark/index.htm"
     html = make_url_request_using_cache(findapark_url, CACHE_DICT)
 
@@ -156,7 +145,6 @@ def build_state_url_dict():
     for s in headers:
         state_url_dict[s["alt"].lower()]= "https://www.nps.gov" +s["href"]
 
-    #CACHE_DICT[findapark_url] = state_url_dict # save the findapark url as ane dist item in CACHE
 
     return state_url_dict
 
@@ -178,18 +166,6 @@ def get_site_instance(site_url):
     '''
 
     CACHE_DICT = open_cache()
-
-    # if site_url in CACHE_DICT.keys():
-    #     print("Using cache")
-    #     return site_instance
-
-
-    # else: 
-    #     print("Fetching")
-    #     time.sleep(1)
-    #     html = requests.get(site_url).text
-    #     CACHE_DICT[site_url] = html
-    #     save_cache(CACHE_DICT)
 
         
 
@@ -216,11 +192,6 @@ def get_site_instance(site_url):
     
     site_instance= NationalSite(nm,add,zp,ph,ct)
     
-    #CACHE_DICT[site_url] = {"name": site_instance.name, "address": site_instance.address, "zipcode":site_instance.zipcode,"phone": site_instance.phone, "category": site_instance.category}
-
-    
-    #save_cache(CACHE_DICT)####~~~~TypeError: Object of type NationalSite is not JSON serializable
-    #return CACHE_DICT[site_url]
     return site_instance
 
 
@@ -244,26 +215,11 @@ def get_sites_for_state(state_url):
 
     CACHE_DICT = open_cache()
 
-    # if state_url in CACHE_DICT.keys():
-    #     print("Using cache")
-    #     return nationalsiteList
-
-    
-    # else:
-    #     print("Fetching")
-    #     time.sleep(1)
-
-    #     html = requests.get(state_url).text
-    #     CACHE_DICT[state_url] = html
-    #     save_cache(CACHE_DICT)
-
-
     html = make_url_request_using_cache(state_url,CACHE_DICT)
 
     #use BeautifulSoup and an html parser to read in the data
     soup = BeautifulSoup(html, 'html.parser')
-    #CACHE_DICT[state_url] = soup #cache beautigfulsoup
-    #~~~~~~~~~~~~~~~~~~~~~~~~save_cache(CACHE_DICT) 
+
 
     nationalsiteList = []
 
@@ -276,46 +232,10 @@ def get_sites_for_state(state_url):
             site_URL = "https://www.nps.gov/" + short_site_url
             nationalsiteList.append(get_site_instance(site_URL))
 
-            
-    #CACHE_DICT[state_url] = nationalsiteList
-    
-    #print(nationalsiteList)
     
     return nationalsiteList
-    #return CACHE_DICT[state_url]
 
 
-
-
-def construct_unique_key(baseurl, params):
-    ''' constructs a key that is guaranteed to uniquely and 
-    repeatably identify an API request by its baseurl and params
-
-    AUTOGRADER NOTES: To correctly test this using the autograder, use an underscore ("_") 
-    to join your baseurl with the params and all the key-value pairs from params
-    E.g., baseurl_key1_value1
-    
-    Parameters
-    ----------
-    baseurl: string
-        The URL for the API endpoint
-    params: dict
-        A dictionary of param:value pairs
-    
-    Returns
-    -------
-    string
-        the unique key as a string
-    '''
-    #TODO Implement function
-    
-    params_str = []
-    connector = '_'
-    for d in params.keys(): 
-        params_str.append(f"{d}_{params[d]}")
-    params_str.sort() # sort the params based on the key alphabet order, then in defination of params, do not need to put count in front of q
-    unique_key = baseurl+connector+connector.join(params_str) #join() concatenates strings
-    return unique_key
 
 def get_nearby_places(site_object):
     '''Obtain API data from MapQuest API.
@@ -334,28 +254,14 @@ def get_nearby_places(site_object):
 
 
     api_key = secrets.API_KEY
-    #GluS6GW6C2ABVLJSnFXYv38tP23j9XuM
     
     base_url = "http://www.mapquestapi.com/search/v2/radius?radius=10&maxMatches=10&ambiguities=ignore&outFormat=json"
 
-    #https://www.mapquestapi.com/search/v2/radius?radius=4&maxMatches=3&ambiguities=ignore&outFormat=json&key=GluS6GW6C2ABVLJSnFXYv38tP23j9XuM&origin=48310
-
     params = {'key': api_key, 'origin': site_object.zipcode} #define params dict
 
-    
 
-    # if site_object.zipcode in CACHE_DICT.keys(): 
-    #     print("Using cache")
-    #     return result_dict
-
-    # else: 
-    #     print("Fetching")
-
-        # #unique_KEY = construct_unique_key(base_url, params)
-        # print(unique_KEY)
     html = make_url_request_using_cache(base_url,CACHE_DICT, params = params)
 
-        # response = requests.get(base_url,params = params) #request json from url
     results = json.loads(html)
 
     statuslist = results["searchResults"]
@@ -371,11 +277,7 @@ def get_nearby_places(site_object):
         else:
             key = z["name"] + " (" + z["fields"]["group_sic_code_name_ext"]+") "
             result_dict[key] = z["fields"]["address"] + " " + z["fields"]["city"]
-    
-    #CACHE_DICT[site_object.zipcode] = result_dict
-    #save_cache(CACHE_DICT)
 
-    #return result_dict
     return result_dict
 
 
@@ -388,8 +290,6 @@ def get_nearby_places(site_object):
 if __name__ == "__main__":
     state_url_dict = build_state_url_dict()
     user_input = input ("Enter a state name(e.g. Mighian or michigan) or exit: ").lower()
-
-    #CACHE_DICT = open_cache()
 
     while True: 
         if user_input == "exit" : 
